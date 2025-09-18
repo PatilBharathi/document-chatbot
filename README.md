@@ -58,6 +58,9 @@ Step 3: Run the chatbot
 
 📖 Example Interaction
 
+<img width="997" height="1643" alt="image" src="https://github.com/user-attachments/assets/91cd7d18-46a4-452c-9c35-56a7d302c7e6" />
+
+
 🛠️ Requirements
 
 	Python 3.9+
