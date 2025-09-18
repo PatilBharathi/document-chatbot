@@ -16,7 +16,7 @@ THRESHOLD = 1.5
 # ----------------------------
 
 # ---------- Page Setup ----------
-st.set_page_config(page_title="Conversational Chatbot", layout="wide")
+st.set_page_config(page_title="Conversational Document Chatbot", layout="wide")
 
 st.markdown(
     """
@@ -30,7 +30,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Control buttons with alignment
+# Control buttons
 col1, col2, col3 = st.columns([1, 6, 1])
 with col1:
     if st.button("🧹 Clear Chat", use_container_width=True):
@@ -44,7 +44,6 @@ with col3:
 st.markdown(
     """
     <style>
-    /* User message bubble */
     .user-bubble {
         background-color: #2b5278;
         color: white;
@@ -55,8 +54,6 @@ st.markdown(
         float: right;
         clear: both;
     }
-
-    /* Assistant message bubble */
     .bot-bubble {
         background-color: #3c3c3c;
         color: #f5f5f5;
@@ -67,8 +64,6 @@ st.markdown(
         float: left;
         clear: both;
     }
-
-    /* Chat area cleanup */
     .chat-container {
         padding: 10px;
     }
@@ -78,7 +73,6 @@ st.markdown(
 )
 
 # ---------- Utilities ----------
-
 @st.cache_resource
 def load_resources():
     index = faiss.read_index(INDEX_PATH)
@@ -92,8 +86,7 @@ index, chunks, model, gen_pipeline = load_resources()
 
 def expand_query(query: str) -> str:
     q = query.lower()
-    q = q.replace("leaked", "leak")
-    q = q.replace("insider", "inside")
+    q = q.replace("leaked", "leak").replace("insider", "inside")
     q = q.replace("water", "flood")
     return q
 
@@ -124,7 +117,7 @@ def retrieve(query, index, chunks, model, top_k=TOP_K, threshold=THRESHOLD):
         score = float(distances[0][i])
         if score < threshold:
             chunk = chunks[idx]
-            if not is_toc_like(chunk):
+            if not is_toc_like(chunk) and any(word in chunk.lower() for word in query.lower().split()):
                 results.append({"chunk": chunk, "distance": score})
     return results
 
@@ -132,10 +125,14 @@ def clean_answer(text: str) -> str:
     bad_phrases = [
         "Answer the question", "Answer in 1–2 sentences",
         "Use only the manual context", "based only on the manual",
-        "If you are a helpful assistant"
+        "If you are a helpful assistant",
+        "User Manual", "Rev "   # 🔥 FIX: remove noisy references
     ]
     for phrase in bad_phrases:
         text = text.replace(phrase, "")
+    text = re.sub(r"If the answer.*?information\.?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"Context:|User Question:|Answer:", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s{2,}", " ", text)
     return text.strip()
 
 def deduplicate_sentences_fuzzy(text: str, threshold: float = 0.8) -> str:
@@ -168,11 +165,17 @@ def remove_toc_lines(text: str) -> str:
     return "\n".join(cleaned)
 
 def format_answer(answer: str) -> str:
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', answer) if s.strip()]
-    if len(sentences) > 3:
-        bullets = "\n".join([f"- {s}" for s in sentences])
-        return bullets
-    return answer
+    """
+    Format answer into proper Markdown bullet points if multiple parts exist.
+    """
+    answer = re.sub(r'\s+', ' ', answer).strip()
+    parts = re.split(r'(?<=[.!?])\s+|-\s+', answer)
+    parts = [p.strip(" -•") for p in parts if p.strip()]
+
+    if len(parts) > 1:
+        return "\n".join([f"- {p}" for p in parts])
+    else:
+        return parts[0] if parts else answer
 
 def get_dynamic_max_tokens(query: str, context_text: str) -> tuple:
     query_len = len(query.split())
@@ -185,27 +188,53 @@ def get_dynamic_max_tokens(query: str, context_text: str) -> tuple:
     else:
         return int(base * 0.5), min(300, base + 50)
 
-# ---------- Chatbot Logic ----------
+# ---------- Chat Rendering ----------
+def render_user_message(msg: str):
+    st.markdown(f'<div class="user-bubble">{msg}</div>', unsafe_allow_html=True)
 
+def render_bot_message(msg: str):
+    # Convert Markdown-style bullets into real <ul><li> for HTML rendering inside the bubble
+    if msg.strip().startswith("-"):
+        items = [f"<li>{line[1:].strip()}</li>" for line in msg.splitlines() if line.strip().startswith("-")]
+        html_list = "<ul>" + "".join(items) + "</ul>"
+        content = html_list
+    else:
+        content = f"<p>{msg}</p>"
+
+    st.markdown(
+        f"""
+        <div class="bot-bubble">
+            {content}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ---------- Chatbot Logic ----------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display history with chat bubbles
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 for msg in st.session_state.messages:
     if msg["role"] == "user":
-        st.markdown(f'<div class="user-bubble">{msg["content"]}</div>', unsafe_allow_html=True)
+        render_user_message(msg["content"])
     else:
-        st.markdown(f'<div class="bot-bubble">{msg["content"]}</div>', unsafe_allow_html=True)
+        render_bot_message(msg["content"])
 st.markdown('</div>', unsafe_allow_html=True)
 
 if query := st.chat_input("Type your question..."):
     st.session_state.messages.append({"role": "user", "content": query})
-    st.markdown(f'<div class="user-bubble">{query}</div>', unsafe_allow_html=True)
+    render_user_message(query)
 
-    chitchat = ["how are you", "hello", "hi", "what's up"]
+    chitchat = {
+        "how are you": "😃 I’m doing great! Ready to answer your questions about the manual 🚀",
+        "hello": "👋 Hi there! What would you like to know from the manual?",
+        "hi": "👋 Hello! How can I help you with the manual?",
+        "what's up": "📘 I’m here to help you understand the manual better!"
+    }
+
     if query.lower().strip() in chitchat:
-        answer = "👋 I’m here to help with the manual. Could you ask me something about the system?"
+        answer = chitchat[query.lower().strip()]
     else:
         expanded = expand_query(query)
         results = []
@@ -215,13 +244,32 @@ if query := st.chat_input("Type your question..."):
                 break
 
         if not results:
-            answer = "I couldn’t find that in the manual. Please contact support at support@ampd.energy."
+            answer = "The context does not provide this information."
         else:
-            context_text = " ".join([res["chunk"] for res in results])
+            # 🔥 FIX: limit to top 2 chunks only
+            context_text = " ".join([res["chunk"] for res in results[:2]])
+
+            # 🔥 FIX: stronger prompt
             prompt = f"""
-            Context: {context_text}
-            Question: {query}
-            Provide a clear and helpful answer:
+            You are a helpful assistant answering questions from a user manual.  
+
+            Rules:
+            - Use only the relevant information from the provided context.
+            - If multiple chunks are provided, ignore unrelated or duplicate sentences.
+            - If the answer is not found in the context, reply exactly:
+            "The context does not provide this information."
+            - Always provide the answer in clear, concise bullet points.
+
+            ---
+            Context:
+            {context_text}
+            ---
+
+            User Question:
+            {query}
+
+            ---
+            Answer (bullet points only):
             """
             min_len, max_tokens = get_dynamic_max_tokens(query, context_text)
             with st.spinner("🤔 Thinking..."):
@@ -232,12 +280,16 @@ if query := st.chat_input("Type your question..."):
                     do_sample=False
                 )
             raw_answer = result[0].get("generated_text", "").strip()
+
+            if query.lower() in raw_answer.lower():
+                raw_answer = raw_answer.replace(query, "").strip()
+
             answer = clean_answer(raw_answer)
             answer = deduplicate_sentences_fuzzy(answer)
             answer = remove_repetitions(answer)
             answer = trim_incomplete(answer)
             answer = remove_toc_lines(answer)
             answer = format_answer(answer)
-
+            
     st.session_state.messages.append({"role": "assistant", "content": answer})
-    st.markdown(f'<div class="bot-bubble">{answer}</div>', unsafe_allow_html=True)
+    render_bot_message(answer)
