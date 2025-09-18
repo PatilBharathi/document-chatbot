@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual environment
+venv/
+.venv/
+
+# Jupyter / Streamlit cache
+.ipynb_checkpoints
+.streamlit/
+.cache/
+huggingface/
+
+# Data & models (don’t push big files)
+data/user_manual.pdf
+data/*.bin
+data/*.pkl
+*.bin
+*.pkl
+*.onnx
+*.pt
+
+# OS
+.DS_Store
+Thumbs.db
