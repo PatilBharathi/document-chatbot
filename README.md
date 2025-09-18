@@ -1,29 +1,45 @@
 💬 Document Chatbot (RAG)
 
 A Retrieval-Augmented Generation (RAG) chatbot built with Python, FAISS, Hugging Face Transformers, and Streamlit.
-It answers user queries by retrieving relevant content from a PDF manual and generating concise, context-aware responses.
+It answers user queries by retrieving relevant content from a PDF manual and generating concise, bullet-point responses inside a modern chat UI.
 
 🚀 Features
 
-Document Processing: Splits the manual into overlapping chunks, embeds them with MiniLM, and builds a FAISS index.
+Document Processing
 
-Efficient Retrieval: Synonym-based query expansion, threshold filtering, TOC cleanup, and top-k search.
+	Extracts text from PDF, removes headers/footers.
+	Splits into sentence-aware overlapping chunks (~200 words, 20% overlap).
+	Embeds with MiniLM and builds a FAISS index.
 
-Response Generation: Free, CPU-friendly model (flan-t5-large) generates natural answers.
+Efficient Retrieval
 
-Post-processing: Deduplication, repetition cleanup, sentence trimming, bullet-point formatting.
+	Query expansion with synonyms.
+	Threshold filtering and TOC cleanup.
+	Retriever limited to top-2 chunks to reduce noise.
 
-Chat UI: Modern Streamlit interface with:
+Response Generation
 
-	Chat bubbles (user right, bot left)
+	Uses free, CPU-friendly model flan-t5-large.
+	Strict prompting rules enforce concise, bullet-only answers.
+ 
+Post-processing
 
-	“🤔 Thinking…” spinner while generating
+	Deduplication and repetition cleanup.
+	Sentence trimming to remove incomplete fragments.
+	Filters out noisy content like "User Manual Rev …".
 
-	Clear Chat & Exit buttons
+Chat UI (Streamlit)
+
+	Clean chat bubbles (user → right, bot → left).
+	Bullets render properly inside chat bubbles.
+	“🤔 Thinking…” spinner while generating.
+	Clear Chat and Exit Chatbot buttons.
+
  
 📂 Project Structure
 
-<img width="618" height="211" alt="image" src="https://github.com/user-attachments/assets/c7aa3336-3229-4a69-a624-9542c10069a7" />
+<img width="647" height="216" alt="image" src="https://github.com/user-attachments/assets/82c16735-058e-4a38-8314-94998a33c285" />
+
 
 
 ⚙️ Installation
@@ -79,28 +95,24 @@ This project is lightweight and can run fully on CPU.
 	Minimum:
 
 		CPU: Dual-core (Intel i3 / AMD equivalent)
-
 		RAM: 8 GB
-
 		Disk: ~2 GB free (for embeddings + model cache)
 
 	Recommended:
 
 		CPU: Quad-core (Intel i5/i7 or AMD Ryzen 5/7)
-
 		RAM: 16 GB (for faster embedding/model inference)
-
 		Disk: ~5 GB free
 
 	Optional GPU:
 
-	If available (CUDA-enabled), Hugging Face Transformers will automatically use it to speed up inference.
-
+		If available (CUDA-enabled), Hugging Face Transformers will automatically use it to speed up inference.
 	Not required for this project since it uses flan-t5-large (CPU-friendly).
  
 🧩 Future Improvements
 
-	Index images via OCR or vision models to support diagrams.
+	Add citations (section + page references) below answers.
+	Index images/diagrams via OCR or vision models.
 	Hybrid retrieval (BM25 + embeddings).
 	Feedback system to refine answers.
 	Export chat history as text.
